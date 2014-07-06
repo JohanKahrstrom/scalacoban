@@ -1,16 +1,18 @@
 package com.jk.scalacoban
 
-trait ConsoleGame extends Game {
-  def drawTerrain = {
-    val Position(bx, by) = terrain.bounds
-    def boxPositions = boxes map { e: Entity => e.position }
+import com.jk.game.Game
+
+trait ConsoleScalacobanGame extends Game[Move, ScalacobanGame] {
+  def draw(state: ScalacobanGame) = {
+    val Position(bx, by) = state.terrain.bounds
+    def boxPositions = state.boxes map { e: Entity => e.position }
 
     def drawStrip(y: Int) {
       for { x <- 0 to bx } {
-        if (user.position == Position(x, y)) print("*")
+        if (state.user.position == Position(x, y)) print("*")
         else if (boxPositions.contains(Position(x, y))) print("@")
-        else if (terrain.isWall(Position(x, y))) print("#")
-        else if (terrain.isSink(Position(x, y))) print("o")
+        else if (state.terrain.isWall(Position(x, y))) print("#")
+        else if (state.terrain.isSink(Position(x, y))) print("o")
         else print(" ")
       }
     }
@@ -26,24 +28,26 @@ trait ConsoleGame extends Game {
     print("\n")
   }
 
-  def handleInput = {
+  def readInput: Move = {
     Console.readLine match {
-      case "u" => moveUser(MoveUp)
-      case "l" => moveUser(MoveLeft)
-      case "r" => moveUser(MoveRight)
-      case "d" => moveUser(MoveDown)
-      case _ =>
+      case "u" => MoveUp
+      case "l" => MoveLeft
+      case "r" => MoveRight
+      case "d" => MoveDown
+      case _ => NoMove
     }
   }
 
-  def run() {
-    print("Type 'u', 'l', 'r' or 'd' and press enter to move.\n")
-    while (!isFinished) {
-      drawTerrain
-      handleInput
+  def update(input: => Move, state: ScalacobanGame): ScalacobanGame = {
+    if (state.isFirst) {
+      state.notFirst
+    } else {
+      state.moveUser(input)
     }
-    drawTerrain
-    print("Done!")
+  }
+
+  def shouldQuit(state: ScalacobanGame): Boolean = {
+    state.isFinished
   }
 }
 
@@ -58,12 +62,13 @@ object SimpleTerrain extends Level {
   def bounds = Position(5, 5)
 }
 
-object ConsoleGameImpl extends ConsoleGame {
+object ConsoleScalacobanGameImpl extends ConsoleScalacobanGame {
   val user = new Entity(0, 0)
   val boxes = Set(new Entity(1, 1), new Entity(2, 2))
   val terrain = SimpleTerrain
+  val scalacobanGame = ScalacobanGame(user, boxes, terrain, true)
 
   def main(args: Array[String]) {
-    run()
+    run(scalacobanGame)
   }
 }

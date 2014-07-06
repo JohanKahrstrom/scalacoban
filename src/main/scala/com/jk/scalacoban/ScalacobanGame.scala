@@ -10,24 +10,21 @@ case class Position(x: Int, y: Int) {
 }
 
 sealed trait Move { def move(position: Position): Position }
+case object NoMove extends Move { def move(position: Position) = position }
 case object MoveLeft extends Move { def move(position: Position) = position.left }
 case object MoveRight extends Move { def move(position: Position) = position.right }
 case object MoveUp extends Move { def move(position: Position) = position.up }
 case object MoveDown extends Move { def move(position: Position) = position.down }
 
-class Entity(var position: Position) {
+case class Entity(val position: Position) {
   def this(x: Int, y: Int) = this(Position(x, y))
-
-  def setPosition(newPosition: Position) {
-    position = newPosition
-  }
 
   def right = position.right
   def left  = position.left
   def up    = position.up
   def down  = position.down
 
-  def move(m: Move) { position = m.move(position) }
+  def move(m: Move): Entity = { Entity(m.move(position)) }
 }
 
 trait Level {
@@ -37,19 +34,23 @@ trait Level {
   def bounds: Position
 }
 
-trait Game {
-  val user: Entity
-  val boxes: Set[Entity]
-  val terrain: Level
-  
-  def moveUser(m: Move) = {
+case class ScalacobanGame(val user: Entity, val boxes: Set[Entity], val terrain: Level, val isFirst: Boolean) {
+  def withUser(newUser: Entity) = ScalacobanGame(newUser, boxes, terrain, isFirst)
+
+  def moveUser(m: Move): ScalacobanGame = {
     val newPosition = m.move(user.position)
-    if (canMove(user, newPosition)) user.move(m)
-    else for { box <- getPushableBox(newPosition, m) } {
-      box.move(m)
-      user.move(m)
+    if (canMove(user, newPosition)) withUser(user.move(m))
+    else {
+      val optionGame = for { box <- getPushableBox(newPosition, m) } yield {
+        val newBoxes = (boxes - box) + box.move(m)
+        val newUser = user.move(m)
+        ScalacobanGame(newUser, newBoxes, terrain, isFirst)
+      }
+      optionGame.getOrElse(this)
     }
   }
+
+  def notFirst = ScalacobanGame(user, boxes, terrain, false)
   
   def isFinished: Boolean = {
     boxes forall { box => terrain.isSink(box.position) }
@@ -60,9 +61,6 @@ trait Game {
   }
   
   private def getPushableBox(p: Position, m: Move): Option[Entity] = {
-    boxes filter { b => b.position == p } headOption match {
-      case Some(e) if canMove(e, m.move(p)) => Some(e)
-      case _ => None
-    }
+    boxes filter { b => b.position == p } filter { b => canMove(b, m.move(p)) } headOption
   }
 }
